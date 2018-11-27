@@ -184,13 +184,13 @@ bool CClaimTrieCacheNormalizationFork::normalizeAllNamesInTrieIfNecessary(insert
     if (nCurrentHeight == Params().GetConsensus().nNormalizedNameForkHeight) {
 
         // run the one-time upgrade of all names that need to change
-        std::vector<namedNodeType> nodes = flattenTrie(); // TODO: replace all these calls with a real iterator (coded in #106)
+        std::vector<namedNodeType> nodes = flattenTrie(); // TODO: replace all these flatten calls with a real iterator (coded in #106)
         for (std::vector<namedNodeType>::iterator it = nodes.begin(); it != nodes.end(); ++it) {
             if (it->second.claims.empty()) continue;
             const std::string normalized = normalizeClaimName(it->first, true);
             if (normalized == it->first) continue;
 
-            LogPrintf("%s: Converting name on normalization fork upgrade: %s -> %s at %d\n", __func__, it->first.c_str(), normalized.c_str(), nCurrentHeight);
+            // LogPrintf("%s: Converting name on normalization fork upgrade: %s -> %s at %d\n", __func__, it->first.c_str(), normalized.c_str(), nCurrentHeight);
 
             supportMapEntryType supports;
             if (getSupportsForName(it->first, supports)) {
