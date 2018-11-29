@@ -91,19 +91,19 @@ UniValue getclaimsintrie(const UniValue& params, bool fHelp)
         UniValue claims(UniValue::VARR);
         for (std::vector<CClaimValue>::iterator itClaims = it->second.claims.begin(); itClaims != it->second.claims.end(); ++itClaims) {
             UniValue claim(UniValue::VOBJ);
-            claim.push_back(Pair("claimId", itClaims->claimId.GetHex()));
-            claim.push_back(Pair("txid", itClaims->outPoint.hash.GetHex()));
-            claim.push_back(Pair("n", (int)itClaims->outPoint.n));
-            claim.push_back(Pair("amount", ValueFromAmount(itClaims->nAmount)));
-            claim.push_back(Pair("height", itClaims->nHeight));
+            claim.pushKV("claimId", itClaims->claimId.GetHex());
+            claim.pushKV("txid", itClaims->outPoint.hash.GetHex());
+            claim.pushKV("n", (int)itClaims->outPoint.n);
+            claim.pushKV("amount", ValueFromAmount(itClaims->nAmount));
+            claim.pushKV("height", itClaims->nHeight);
             const CCoins* coin = coinsCache.AccessCoins(itClaims->outPoint.hash);
             if (!coin) {
                 LogPrintf("%s: %s does not exist in the coins view, despite being associated with a name\n",
                     __func__, itClaims->outPoint.hash.GetHex());
-                claim.push_back(Pair("error", "No value found for claim"));
+                claim.pushKV("error", "No value found for claim");
             } else if (!coin->IsAvailable(itClaims->outPoint.n)) {
                 LogPrintf("%s: the specified txout of %s appears to have been spent\n", __func__, itClaims->outPoint.hash.GetHex());
-                claim.push_back(Pair("error", "Txout spent"));
+                claim.pushKV("error", "Txout spent");
             } else {
                 int op;
                 std::vector<std::vector<unsigned char> > vvchParams;
@@ -111,18 +111,18 @@ UniValue getclaimsintrie(const UniValue& params, bool fHelp)
                     LogPrintf("%s: the specified txout of %s does not have an claim command\n", __func__, itClaims->outPoint.hash.GetHex());
                 }
                 std::string sValue(vvchParams[1].begin(), vvchParams[1].end());
-                claim.push_back(Pair("value", sValue));
+                claim.pushKV("value", EncodeBase64(sValue));
             }
             std::string targetName;
             CClaimValue targetClaim;
             if (pclaimTrie->getClaimById(itClaims->claimId, targetName, targetClaim))
-                claim.push_back(Pair("name", targetName));
+                claim.pushKV("name", targetName);
             claims.push_back(claim);
         }
 
         UniValue node(UniValue::VOBJ);
-        node.push_back(Pair("normalizedName", it->first));
-        node.push_back(Pair("claims", claims));
+        node.pushKV("normalizedName", it->first);
+        node.pushKV("claims", claims);
         ret.push_back(node);
     }
     return ret;
@@ -169,15 +169,15 @@ UniValue getclaimtrie(const UniValue& params, bool fHelp)
     for (std::vector<namedNodeType>::iterator it = nodes.begin(); it != nodes.end(); ++it)
     {
         UniValue node(UniValue::VOBJ);
-        node.push_back(Pair("name", it->first));
-        node.push_back(Pair("hash", it->second.hash.GetHex()));
+        node.pushKV("name", it->first);
+        node.pushKV("hash", it->second.hash.GetHex());
         CClaimValue claim;
         if (it->second.getBestClaim(claim))
         {
-            node.push_back(Pair("txid", claim.outPoint.hash.GetHex()));
-            node.push_back(Pair("n", (int)claim.outPoint.n));
-            node.push_back(Pair("value", ValueFromAmount(claim.nAmount)));
-            node.push_back(Pair("height", claim.nHeight));
+            node.pushKV("txid", claim.outPoint.hash.GetHex());
+            node.pushKV("n", (int)claim.outPoint.n);
+            node.pushKV("value", ValueFromAmount(claim.nAmount));
+            node.pushKV("height", claim.nHeight);
         }
         ret.push_back(node);
     }
@@ -215,6 +215,7 @@ bool getValueForClaim(const CCoinsViewCache& coinsCache, const COutPoint& out, s
     {
         sValue = std::string(vvchParams[2].begin(), vvchParams[2].end());
     }
+    sValue = EncodeBase64(sValue);
     return true;
 }
 
@@ -267,18 +268,18 @@ UniValue getvalueforname(const UniValue& params, bool fHelp)
 
     CAmount nEffectiveAmount = trieCache.getEffectiveAmountForClaim(name, claim.claimId);
 
-    ret.push_back(Pair("value", sValue));
-    ret.push_back(Pair("claimId", claim.claimId.GetHex()));
-    ret.push_back(Pair("txid", claim.outPoint.hash.GetHex()));
-    ret.push_back(Pair("n", (int)claim.outPoint.n));
-    ret.push_back(Pair("amount", claim.nAmount));
-    ret.push_back(Pair("effective amount", nEffectiveAmount));
-    ret.push_back(Pair("height", claim.nHeight));
+    ret.pushKV("value", sValue);
+    ret.pushKV("claimId", claim.claimId.GetHex());
+    ret.pushKV("txid", claim.outPoint.hash.GetHex());
+    ret.pushKV("n", (int)claim.outPoint.n);
+    ret.pushKV("amount", claim.nAmount);
+    ret.pushKV("effective amount", nEffectiveAmount);
+    ret.pushKV("height", claim.nHeight);
 
     std::string targetName;
     CClaimValue targetClaim;
     if (pclaimTrie->getClaimById(claim.claimId, targetName, targetClaim))
-        ret.push_back(Pair("name", targetName));
+        ret.pushKV("name", targetName);
 
     return ret;
 }
@@ -289,11 +290,11 @@ typedef std::map<uint160, claimAndSupportsType> claimSupportMapType;
 UniValue supportToJSON(const CSupportValue& support)
 {
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("txid", support.outPoint.hash.GetHex()));
-    ret.push_back(Pair("n", (int)support.outPoint.n));
-    ret.push_back(Pair("nHeight", support.nHeight));
-    ret.push_back(Pair("nValidAtHeight", support.nValidAtHeight));
-    ret.push_back(Pair("nAmount", support.nAmount));
+    ret.pushKV("txid", support.outPoint.hash.GetHex());
+    ret.pushKV("n", (int)support.outPoint.n);
+    ret.pushKV("nHeight", support.nHeight);
+    ret.pushKV("nValidAtHeight", support.nValidAtHeight);
+    ret.pushKV("nAmount", support.nAmount);
     return ret;
 }
 
@@ -306,19 +307,19 @@ UniValue claimAndSupportsToJSON(CAmount nEffectiveAmount, claimSupportMapType::c
     for (std::vector<CSupportValue>::const_iterator itSupports = supports.begin(); itSupports != supports.end(); ++itSupports) {
         supportObjs.push_back(supportToJSON(*itSupports));
     }
-    ret.push_back(Pair("claimId", itClaimsAndSupports->first.GetHex()));
-    ret.push_back(Pair("txid", claim.outPoint.hash.GetHex()));
-    ret.push_back(Pair("n", (int)claim.outPoint.n));
-    ret.push_back(Pair("nHeight", claim.nHeight));
-    ret.push_back(Pair("nValidAtHeight", claim.nValidAtHeight));
-    ret.push_back(Pair("nAmount", claim.nAmount));
-    ret.push_back(Pair("nEffectiveAmount", nEffectiveAmount));
-    ret.push_back(Pair("supports", supportObjs));
+    ret.pushKV("claimId", itClaimsAndSupports->first.GetHex());
+    ret.pushKV("txid", claim.outPoint.hash.GetHex());
+    ret.pushKV("n", (int)claim.outPoint.n);
+    ret.pushKV("nHeight", claim.nHeight);
+    ret.pushKV("nValidAtHeight", claim.nValidAtHeight);
+    ret.pushKV("nAmount", claim.nAmount);
+    ret.pushKV("nEffectiveAmount", nEffectiveAmount);
+    ret.pushKV("supports", supportObjs);
 
     std::string targetName;
     CClaimValue targetClaim;
     if (pclaimTrie->getClaimById(claim.claimId, targetName, targetClaim))
-        ret.push_back(Pair("name", targetName));
+        ret.pushKV("name", targetName);
 
     return ret;
 }
@@ -404,8 +405,8 @@ UniValue getclaimsforname(const UniValue& params, bool fHelp)
     }
 
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("nLastTakeoverHeight", claimsForName.nLastTakeoverHeight));
-    ret.push_back(Pair("normalizedName", claimsForName.name));
+    ret.pushKV("nLastTakeoverHeight", claimsForName.nLastTakeoverHeight);
+    ret.pushKV("normalizedName", claimsForName.name);
 
     for (claimSupportMapType::const_iterator itClaimsAndSupports = claimSupportMap.begin(); itClaimsAndSupports != claimSupportMap.end(); ++itClaimsAndSupports) {
         CAmount nEffectiveAmount = trieCache.getEffectiveAmountForClaim(claimsForName, itClaimsAndSupports->first);
@@ -413,8 +414,8 @@ UniValue getclaimsforname(const UniValue& params, bool fHelp)
         claimObjs.push_back(claimObj);
     }
 
-    ret.push_back(Pair("claims", claimObjs));
-    ret.push_back(Pair("unmatched supports", unmatchedSupports));
+    ret.pushKV("claims", claimObjs);
+    ret.pushKV("unmatched supports", unmatchedSupports);
     return ret;
 }
 
@@ -463,32 +464,32 @@ UniValue getclaimbyid(const UniValue& params, bool fHelp)
         std::string sValue;
         CCoinsViewCache coins(pcoinsTip);
         getValueForClaim(coins, claimValue.outPoint, sValue);
-        claim.push_back(Pair("name", name));
+        claim.pushKV("name", name);
         if (cache.shouldNormalize())
-            claim.push_back(Pair("normalizedName", cache.normalizeClaimName(name)));
-        claim.push_back(Pair("value", sValue));
-        claim.push_back(Pair("claimId", claimValue.claimId.GetHex()));
-        claim.push_back(Pair("txid", claimValue.outPoint.hash.GetHex()));
-        claim.push_back(Pair("n", (int) claimValue.outPoint.n));
-        claim.push_back(Pair("amount", claimValue.nAmount));
-        claim.push_back(Pair("effective amount", effectiveAmount));
+            claim.pushKV("normalizedName", cache.normalizeClaimName(name));
+        claim.pushKV("value", sValue);
+        claim.pushKV("claimId", claimValue.claimId.GetHex());
+        claim.pushKV("txid", claimValue.outPoint.hash.GetHex());
+        claim.pushKV("n", (int) claimValue.outPoint.n);
+        claim.pushKV("amount", claimValue.nAmount);
+        claim.pushKV("effective amount", effectiveAmount);
         UniValue supportList(UniValue::VARR);
         BOOST_FOREACH(const CSupportValue& support, supports) {
             UniValue supportEntry(UniValue::VOBJ);
-            supportEntry.push_back(Pair("txid", support.outPoint.hash.GetHex()));
-            supportEntry.push_back(Pair("n", (int)support.outPoint.n));
-            supportEntry.push_back(Pair("height", support.nHeight));
-            supportEntry.push_back(Pair("valid at height", support.nValidAtHeight));
-            supportEntry.push_back(Pair("amount", support.nAmount));
+            supportEntry.pushKV("txid", support.outPoint.hash.GetHex());
+            supportEntry.pushKV("n", (int)support.outPoint.n);
+            supportEntry.pushKV("height", support.nHeight);
+            supportEntry.pushKV("valid at height", support.nValidAtHeight);
+            supportEntry.pushKV("amount", support.nAmount);
             supportList.push_back(supportEntry);
         }
-        claim.push_back(Pair("supports", supportList));
-        claim.push_back(Pair("height", claimValue.nHeight));
-        claim.push_back(Pair("valid at height", claimValue.nValidAtHeight));
+        claim.pushKV("supports", supportList);
+        claim.pushKV("height", claimValue.nHeight);
+        claim.pushKV("valid at height", claimValue.nValidAtHeight);
         std::string targetName;
         CClaimValue targetClaim;
         if (pclaimTrie->getClaimById(claimValue.claimId, targetName, targetClaim))
-            claim.push_back(Pair("original_name", targetName));
+            claim.pushKV("original_name", targetName);
     }
     return claim;
 }
@@ -624,35 +625,35 @@ UniValue getclaimsfortx(const UniValue& params, bool fHelp)
             UniValue o(UniValue::VOBJ);
             if (DecodeClaimScript(txout.scriptPubKey, op, vvchParams))
             {
-                o.push_back(Pair("nOut", (int64_t)i));
+                o.pushKV("nOut", (int64_t)i);
                 std::string sName(vvchParams[0].begin(), vvchParams[0].end());
-                o.push_back(Pair("name", sName));
+                o.pushKV("name", sName);
                 if (op == OP_CLAIM_NAME)
                 {
                     std::string sValue(vvchParams[1].begin(), vvchParams[1].end());
                     uint160 claimId = ClaimIdHash(hash, i);
-                    o.push_back(Pair("claimId", claimId.GetHex()));
-                    o.push_back(Pair("value", sValue));
+                    o.pushKV("claimId", claimId.GetHex());
+                    o.pushKV("value", EncodeBase64(sValue));
                 }
                 else if (op == OP_UPDATE_CLAIM)
                 {
                     uint160 claimId(vvchParams[1]);
                     std::string sValue(vvchParams[2].begin(), vvchParams[2].end());
-                    o.push_back(Pair("claimId", claimId.GetHex()));
-                    o.push_back(Pair("value", sValue));
+                    o.pushKV("claimId", claimId.GetHex());
+                    o.pushKV("value", EncodeBase64(sValue));
                 }
                 else if (op == OP_SUPPORT_CLAIM)
                 {
                     uint160 supportedClaimId(vvchParams[1]);
-                    o.push_back(Pair("supported claimId", supportedClaimId.GetHex()));
+                    o.pushKV("supported claimId", supportedClaimId.GetHex());
                 }
                 if (nHeight > 0)
                 {
-                    o.push_back(Pair("depth", chainActive.Height() - nHeight));
+                    o.pushKV("depth", chainActive.Height() - nHeight);
                     if (op == OP_CLAIM_NAME || op == OP_UPDATE_CLAIM)
                     {
                         bool inClaimTrie = pclaimTrie->haveClaim(sName, COutPoint(hash, i));
-                        o.push_back(Pair("in claim trie", inClaimTrie));
+                        o.pushKV("in claim trie", inClaimTrie);
                         if (inClaimTrie)
                         {
                             CClaimValue claim;
@@ -660,53 +661,53 @@ UniValue getclaimsfortx(const UniValue& params, bool fHelp)
                             {
                                 LogPrintf("HaveClaim was true but getInfoForName returned false.");
                             }
-                            o.push_back(Pair("is controlling", (claim.outPoint.hash == hash && claim.outPoint.n == i)));
+                            o.pushKV("is controlling", (claim.outPoint.hash == hash && claim.outPoint.n == i));
                         }
                         else
                         {
                             int nValidAtHeight;
                             if (pclaimTrie->haveClaimInQueue(sName, COutPoint(hash, i), nValidAtHeight))
                             {
-                                o.push_back(Pair("in queue", true));
-                                o.push_back(Pair("blocks to valid", nValidAtHeight - chainActive.Height()));
+                                o.pushKV("in queue", true);
+                                o.pushKV("blocks to valid", nValidAtHeight - chainActive.Height());
                             }
                             else
                             {
-                                o.push_back(Pair("in queue", false));
+                                o.pushKV("in queue", false);
                             }
                         }
                     }
                     else if (op == OP_SUPPORT_CLAIM)
                     {
                         bool inSupportMap = pclaimTrie->haveSupport(sName, COutPoint(hash, i));
-                        o.push_back(Pair("in support map", inSupportMap));
+                        o.pushKV("in support map", inSupportMap);
                         if (!inSupportMap)
                         {
                             int nValidAtHeight;
                             if (pclaimTrie->haveSupportInQueue(sName, COutPoint(hash, i), nValidAtHeight))
                             {
-                                o.push_back(Pair("in queue", true));
-                                o.push_back(Pair("blocks to valid", nValidAtHeight - chainActive.Height()));
+                                o.pushKV("in queue", true);
+                                o.pushKV("blocks to valid", nValidAtHeight - chainActive.Height());
                             }
                             else
                             {
-                                o.push_back(Pair("in queue", false));
+                                o.pushKV("in queue", false);
                             }
                         }
                     }
                 }
                 else
                 {
-                    o.push_back(Pair("depth", 0));
+                    o.pushKV("depth", 0);
                     if (op == OP_CLAIM_NAME || op == OP_UPDATE_CLAIM)
                     {
-                        o.push_back(Pair("in claim trie", false));
+                        o.pushKV("in claim trie", false);
                     }
                     else if (op == OP_SUPPORT_CLAIM)
                     {
-                        o.push_back(Pair("in support map", false));
+                        o.pushKV("in support map", false);
                     }
-                    o.push_back(Pair("in queue", false));
+                    o.pushKV("in queue", false);
                 }
                 ret.push_back(o);
             }
@@ -726,26 +727,26 @@ UniValue proofToJSON(const CClaimTrieProof& proof)
         for (std::vector<std::pair<unsigned char, uint256> >::const_iterator itChildren = itNode->children.begin(); itChildren != itNode->children.end(); ++itChildren)
         {
             UniValue child(UniValue::VOBJ);
-            child.push_back(Pair("character", itChildren->first));
+            child.pushKV("character", itChildren->first);
             if (!itChildren->second.IsNull())
             {
-                child.push_back(Pair("nodeHash", itChildren->second.GetHex()));
+                child.pushKV("nodeHash", itChildren->second.GetHex());
             }
             children.push_back(child);
         }
-        node.push_back(Pair("children", children));
+        node.pushKV("children", children);
         if (itNode->hasValue && !itNode->valHash.IsNull())
         {
-            node.push_back(Pair("valueHash", itNode->valHash.GetHex()));
+            node.pushKV("valueHash", itNode->valHash.GetHex());
         }
         nodes.push_back(node);
     }
-    result.push_back(Pair("nodes", nodes));
+    result.pushKV("nodes", nodes);
     if (proof.hasValue)
     {
-        result.push_back(Pair("txhash", proof.outPoint.hash.GetHex()));
-        result.push_back(Pair("nOut", (int)proof.outPoint.n));
-        result.push_back(Pair("last takeover height", (int)proof.nHeightOfLastTakeover));
+        result.pushKV("txhash", proof.outPoint.hash.GetHex());
+        result.pushKV("nOut", (int)proof.outPoint.n);
+        result.pushKV("last takeover height", proof.nHeightOfLastTakeover);
     }
     return result;
 }
