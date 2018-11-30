@@ -3659,7 +3659,7 @@ BOOST_AUTO_TEST_CASE(getvalueforname_test)
     params.push_back(UniValue(sName1));
 
     UniValue results = getvalueforname(params, false);
-    BOOST_CHECK(results["value"].get_str() == sValue1);
+    BOOST_CHECK(DecodeBase64(results["value"].get_str()) == sValue1);
     BOOST_CHECK(results["amount"].get_int() == 2);
     BOOST_CHECK(results["effective amount"].get_int() == 5);
 
@@ -3751,7 +3751,7 @@ BOOST_AUTO_TEST_CASE(claim_rpcs_rollback2_test)
     BOOST_CHECK(claimsResults["claims"][1]["supports"].size() == 0U);
 
     UniValue valueResults = getvalueforname(params, false);
-    BOOST_CHECK(valueResults["value"].get_str() == sValue2);
+    BOOST_CHECK(DecodeBase64(valueResults["value"].get_str()) == sValue2);
     BOOST_CHECK(valueResults["amount"].get_int() == 2);
 }
 
@@ -3785,7 +3785,7 @@ BOOST_AUTO_TEST_CASE(claim_rpcs_rollback3_test)
     BOOST_CHECK(claimsResults["nLastTakeoverHeight"].get_int() == height + 1);
 
     UniValue valueResults = getvalueforname(params, false);
-    BOOST_CHECK(valueResults["value"].get_str() == sValue1);
+    BOOST_CHECK(DecodeBase64(valueResults["value"].get_str()) == sValue1);
     BOOST_CHECK(valueResults["amount"].get_int() == 3);
 }
 
