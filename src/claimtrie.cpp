@@ -53,7 +53,7 @@ uint256 getValueHash(COutPoint outPoint, int nHeightOfLastTakeover)
     return valueHash;
 }
 
-bool CClaimTrieNode::insertClaim(CClaimValue claim)
+bool CClaimTrieNode::insertClaim(const CClaimValue& claim)
 {
     LogPrintf("%s: Inserting %s:%d (amount: %d)  into the claim trie\n", __func__, claim.outPoint.hash.ToString(), claim.outPoint.n, claim.nAmount);
     claims.push_back(claim);
@@ -64,7 +64,7 @@ bool CClaimTrieNode::removeClaim(const COutPoint& outPoint, CClaimValue& claim)
 {
     LogPrintf("%s: Removing txid: %s, nOut: %d from the claim trie\n", __func__, outPoint.hash.ToString(), outPoint.n);
 
-    std::vector<CClaimValue>::iterator itClaims;
+    nodeClaimsType::iterator itClaims;
     for (itClaims = claims.begin(); itClaims != claims.end(); ++itClaims)
     {
         if (itClaims->outPoint == outPoint)
@@ -105,7 +105,7 @@ bool CClaimTrieNode::getBestClaim(CClaimValue& claim) const
 
 bool CClaimTrieNode::haveClaim(const COutPoint& outPoint) const
 {
-    for (std::vector<CClaimValue>::const_iterator itclaim = claims.begin(); itclaim != claims.end(); ++itclaim)
+    for (nodeClaimsType::const_iterator itclaim = claims.begin(); itclaim != claims.end(); ++itclaim)
     {
         if (itclaim->outPoint == outPoint)
             return true;
@@ -115,7 +115,7 @@ bool CClaimTrieNode::haveClaim(const COutPoint& outPoint) const
 
 void CClaimTrieNode::reorderClaims(supportMapEntryType& supports)
 {
-    std::vector<CClaimValue>::iterator itclaim;
+    nodeClaimsType::iterator itclaim;
 
     for (itclaim = claims.begin(); itclaim != claims.end(); ++itclaim)
     {
@@ -139,12 +139,12 @@ void CClaimTrieNode::reorderClaims(supportMapEntryType& supports)
 
 uint256 CClaimTrie::getMerkleHash()
 {
-    return root.hash;
+    return root->hash;
 }
 
 bool CClaimTrie::empty() const
 {
-    return root.empty();
+    return root->empty();
 }
 
 template<typename K> bool CClaimTrie::keyTypeEmpty(char keyType, K& dummy) const
@@ -223,7 +223,7 @@ void CClaimTrie::setExpirationTime(int t)
 
 void CClaimTrie::clear()
 {
-    clear(&root);
+    clear(root);
 }
 
 void CClaimTrie::clear(CClaimTrieNode* current)
@@ -231,13 +231,13 @@ void CClaimTrie::clear(CClaimTrieNode* current)
     for (nodeMapType::const_iterator itchildren = current->children.begin(); itchildren != current->children.end(); ++itchildren)
     {
         clear(itchildren->second);
-        delete itchildren->second;
     }
+    current->children.clear();
 }
 
 bool CClaimTrie::haveClaim(const std::string& name, const COutPoint& outPoint) const
 {
-    const CClaimTrieNode* current = &root;
+    const CClaimTrieNode* current = root;
     for (std::string::const_iterator itname = name.begin(); itname != name.end(); ++itname)
     {
         nodeMapType::const_iterator itchildren = current->children.find(*itname);
@@ -345,7 +345,7 @@ unsigned int CClaimTrie::getTotalNamesInTrie() const
 {
     if (empty())
         return 0;
-    const CClaimTrieNode* current = &root;
+    const CClaimTrieNode* current = root;
     return getTotalNamesRecursive(current);
 }
 
@@ -365,7 +365,7 @@ unsigned int CClaimTrie::getTotalClaimsInTrie() const
 {
     if (empty())
         return 0;
-    const CClaimTrieNode* current = &root;
+    const CClaimTrieNode* current = root;
     return getTotalClaimsRecursive(current);
 }
 
@@ -383,14 +383,14 @@ CAmount CClaimTrie::getTotalValueOfClaimsInTrie(bool fControllingOnly) const
 {
     if (empty())
         return 0;
-    const CClaimTrieNode* current = &root;
+    const CClaimTrieNode* current = root;
     return getTotalValueOfClaimsRecursive(current, fControllingOnly);
 }
 
 CAmount CClaimTrie::getTotalValueOfClaimsRecursive(const CClaimTrieNode* current, bool fControllingOnly) const
 {
     CAmount value_in_subtrie = 0;
-    for (std::vector<CClaimValue>::const_iterator itclaim = current->claims.begin(); itclaim != current->claims.end(); ++itclaim)
+    for (nodeClaimsType::const_iterator itclaim = current->claims.begin(); itclaim != current->claims.end(); ++itclaim)
     {
         value_in_subtrie += itclaim->nAmount;
         if (fControllingOnly)
@@ -405,7 +405,7 @@ CAmount CClaimTrie::getTotalValueOfClaimsRecursive(const CClaimTrieNode* current
 
 const CClaimTrieNode* CClaimTrie::getNodeForName(const std::string& name) const
 {
-    const CClaimTrieNode* current = &root;
+    const CClaimTrieNode* current = root;
     for (std::string::const_iterator itname = name.begin(); itname != name.end(); ++itname)
     {
         nodeMapType::const_iterator itchildren = current->children.find(*itname);
@@ -449,7 +449,7 @@ claimsForNameType CClaimTrie::getClaimsForName(const std::string& name) const
         {
             nLastTakeoverHeight = current->nHeightOfLastTakeover;
         }
-        for (std::vector<CClaimValue>::const_iterator itClaims = current->claims.begin(); itClaims != current->claims.end(); ++itClaims)
+        for (nodeClaimsType::const_iterator itClaims = current->claims.begin(); itClaims != current->claims.end(); ++itClaims)
         {
             claims.push_back(*itClaims);
         }
@@ -532,7 +532,7 @@ bool CClaimTrie::checkConsistency() const
 {
     if (empty())
         return true;
-    return recursiveCheckConsistency(&root);
+    return recursiveCheckConsistency(root);
 }
 
 bool CClaimTrie::recursiveCheckConsistency(const CClaimTrieNode* node) const
@@ -833,15 +833,15 @@ bool CClaimTrie::update(nodeCacheType& cache, hashMapType& hashes, std::map<std:
 
 void CClaimTrie::markNodeDirty(const std::string &name, CClaimTrieNode* node)
 {
-    std::pair<nodeCacheType::iterator, bool> ret;
-    ret = dirtyNodes.insert(std::pair<std::string, CClaimTrieNode*>(name, node));
+    std::pair<dirtyNodeType::iterator, bool> ret;
+    ret = dirtyNodes.insert(std::make_pair(name, node));
     if (ret.second == false)
         ret.first->second = node;
 }
 
 bool CClaimTrie::updateName(const std::string &name, CClaimTrieNode* updatedNode)
 {
-    CClaimTrieNode* current = &root;
+    CClaimTrieNode* current = root;
     for (std::string::const_iterator itname = name.begin(); itname != name.end(); ++itname)
     {
         nodeMapType::iterator itchild = current->children.find(*itname);
@@ -897,13 +897,12 @@ bool CClaimTrie::recursiveNullify(CClaimTrieNode* node, std::string& name)
     }
     node->children.clear();
     markNodeDirty(name, NULL);
-    delete node;
     return true;
 }
 
 bool CClaimTrie::updateHash(const std::string& name, uint256& hash)
 {
-    CClaimTrieNode* current = &root;
+    CClaimTrieNode* current = root;
     for (std::string::const_iterator itname = name.begin(); itname != name.end(); ++itname)
     {
         nodeMapType::iterator itchild = current->children.find(*itname);
@@ -919,7 +918,7 @@ bool CClaimTrie::updateHash(const std::string& name, uint256& hash)
 
 bool CClaimTrie::updateTakeoverHeight(const std::string& name, int nTakeoverHeight)
 {
-    CClaimTrieNode* current = &root;
+    CClaimTrieNode* current = root;
     for (std::string::const_iterator itname = name.begin(); itname != name.end(); ++itname)
     {
         nodeMapType::iterator itchild = current->children.find(*itname);
@@ -1049,7 +1048,7 @@ void CClaimTrie::BatchWriteSupportExpirationQueueRows(CDBBatch& batch)
 bool CClaimTrie::WriteToDisk()
 {
     CDBBatch batch(&db.GetObfuscateKey());
-    for (nodeCacheType::iterator itcache = dirtyNodes.begin(); itcache != dirtyNodes.end(); ++itcache)
+    for (dirtyNodeType::iterator itcache = dirtyNodes.begin(); itcache != dirtyNodes.end(); ++itcache)
         BatchWriteNode(batch, itcache->first, itcache->second);
     dirtyNodes.clear();
     BatchWriteQueueRows(batch);
@@ -1075,10 +1074,10 @@ bool CClaimTrie::InsertFromDisk(const std::string& name, CClaimTrieNode* node)
 {
     if (name.size() == 0)
     {
-        root = *node;
+        *root = *node;
         return true;
     }
-    CClaimTrieNode* current = &root;
+    CClaimTrieNode* current = root;
     for (std::string::const_iterator itname = name.begin(); itname + 1 != name.end(); ++itname)
     {
         nodeMapType::iterator itchild = current->children.find(*itname);
@@ -1086,7 +1085,7 @@ bool CClaimTrie::InsertFromDisk(const std::string& name, CClaimTrieNode* node)
             return false;
         current = itchild->second;
     }
-    current->children[name[name.size()-1]] = node;
+    current->children[name[name.size()-1]] = new CClaimTrieNode(*node);
     return true;
 }
 
@@ -1108,10 +1107,10 @@ bool CClaimTrie::ReadFromDisk(bool check)
         {
             if (key.first == TRIE_NODE)
             {
-                CClaimTrieNode* node = new CClaimTrieNode();
-                if (pcursor->GetValue(*node))
+                CClaimTrieNode node;
+                if (pcursor->GetValue(node))
                 {
-                    if (!InsertFromDisk(key.second, node))
+                    if (!InsertFromDisk(key.second, &node))
                     {
                         return error("%s(): error restoring claim trie from disk", __func__);
                     }
@@ -1214,7 +1213,7 @@ uint256 CClaimTrieCache::getMerkleHash() const
     if (ithash != cacheHashes.end())
         return ithash->second;
     else
-        return base->root.hash;
+        return base->root->hash;
 }
 
 bool CClaimTrieCache::empty() const
@@ -1237,12 +1236,7 @@ CClaimTrieNode* CClaimTrieCache::addNodeToCache(const std::string& position, CCl
     nodeCacheType::const_iterator itOriginals = block_originals.find(position);
     if (block_originals.end() == itOriginals)
     {
-        CClaimTrieNode* originalCopy;
-        if(!original)
-            originalCopy = new CClaimTrieNode();
-        else
-            originalCopy = new CClaimTrieNode(*original);
-        block_originals[position] = originalCopy;
+        block_originals[position] = new CClaimTrieNode(*cacheCopy);
     }
     return cacheCopy;
 }
@@ -1299,7 +1293,7 @@ bool CClaimTrieCache::insertClaimIntoTrie(const std::string& name, CClaimValue c
             currentNode = addNodeToCache(sCurrentSubstring, currentNode);
         }
         CClaimTrieNode* newNode = addNodeToCache(sNextSubstring, NULL);
-        currentNode->children[*itCur] = newNode;
+        currentNode->children[*itCur] = new CClaimTrieNode(*newNode);
         currentNode = newNode;
     }
 
@@ -1485,7 +1479,6 @@ bool CClaimTrieCache::recursivePruneName(CClaimTrieNode* tnCurrent, unsigned int
         if (cachedNode != cache.end())
         {
             assert(tnCurrent == cachedNode->second);
-            delete tnCurrent;
             cache.erase(cachedNode);
         }
         fNullified = true;
@@ -1739,9 +1732,9 @@ bool CClaimTrieCache::reorderTrieNode(const std::string& name, bool fCheckTakeov
             // The node doesn't exist, so it can't be reordered.
             return true;
         }
-        currentNode = new CClaimTrieNode(*currentNode);
+        CPointer<CClaimTrieNode> newNode(new CClaimTrieNode(*currentNode));
         std::pair<nodeCacheType::iterator, bool> ret;
-        ret = cache.insert(std::pair<std::string, CClaimTrieNode*>(name, currentNode));
+        ret = cache.insert(std::make_pair(name, newNode));
         assert(ret.second);
         cachedNode = ret.first;
     }
@@ -2310,10 +2303,6 @@ bool CClaimTrieCache::incrementBlock(insertUndoType& insertUndo, claimQueueRowTy
             }
         }
     }
-    for (nodeCacheType::const_iterator itOriginals = block_originals.begin(); itOriginals != block_originals.end(); ++itOriginals)
-    {
-        delete itOriginals->second;
-    }
     block_originals.clear();
     for (nodeCacheType::const_iterator itCache = cache.begin(); itCache != cache.end(); ++itCache)
     {
@@ -2388,10 +2377,6 @@ bool CClaimTrieCache::decrementBlock(insertUndoType& insertUndo, claimQueueRowTy
 
 bool CClaimTrieCache::finalizeDecrement() const
 {
-    for (nodeCacheType::iterator itOriginals = block_originals.begin(); itOriginals != block_originals.end(); ++itOriginals)
-    {
-        delete itOriginals->second;
-    }
     block_originals.clear();
     for (nodeCacheType::const_iterator itCache = cache.begin(); itCache != cache.end(); ++itCache)
     {
@@ -2463,15 +2448,7 @@ void CClaimTrieCache::setBestBlock(const uint256& hashBlockIn)
 
 bool CClaimTrieCache::clear() const
 {
-    for (nodeCacheType::iterator itcache = cache.begin(); itcache != cache.end(); ++itcache)
-    {
-        delete itcache->second;
-    }
     cache.clear();
-    for (nodeCacheType::iterator itOriginals = block_originals.begin(); itOriginals != block_originals.end(); ++itOriginals)
-    {
-        delete itOriginals->second;
-    }
     block_originals.clear();
     dirtyHashes.clear();
     cacheHashes.clear();
@@ -2559,7 +2536,10 @@ claimsForNameType CClaimTrieCache::getClaimsForName(const std::string& name) con
     int nLastTakeoverHeight = 0;
     std::vector<CClaimValue> claims;
     if (const CClaimTrieNode* node = getNodeForName(name)) {
-        claims = node->claims;
+        for (nodeClaimsType::const_iterator itClaims = node->claims.begin(); itClaims != node->claims.end(); ++itClaims)
+        {
+            claims.push_back(*itClaims);
+        }
         getLastTakeoverForName(name, nLastTakeoverHeight);
     }
     supportMapEntryType supports;

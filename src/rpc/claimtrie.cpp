@@ -130,7 +130,7 @@ UniValue getclaimsintrie(const UniValue& params, bool fHelp)
                 return;
 
             UniValue claims(UniValue::VARR);
-            for (std::vector<CClaimValue>::const_iterator itClaims = node->claims.begin(); itClaims != node->claims.end(); ++itClaims) {
+            for (nodeClaimsType::const_iterator itClaims = node->claims.begin(); itClaims != node->claims.end(); ++itClaims) {
                 UniValue claim(UniValue::VOBJ);
                 claim.push_back(Pair("claimId", itClaims->claimId.GetHex()));
                 claim.push_back(Pair("txid", itClaims->outPoint.hash.GetHex()));
